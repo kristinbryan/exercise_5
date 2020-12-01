@@ -33,6 +33,7 @@ library(gganimate)     # for adding animation layers to ggplots
 library(transformr)    # for "tweening" (gganimate)
 library(shiny)         # for creating interactive apps
 library(ggimage)
+library(gifski)
 gs4_deauth()           # To not have to authorize each time you knit.
 theme_set(theme_minimal())
 ```
@@ -107,7 +108,7 @@ tomato_harvest <- garden_harvest %>%
          total_weight_lbs = sum(weight) * 0.00220462) %>%
   ggplot(aes(x = total_weight_lbs, y = fct_reorder(variety, first_harvest_date, .desc = TRUE))) +
   geom_col() +
-  labs(y = "VAriety", x = "Weight", title = "Total Tomato Harvests", subtitle = "From Earliest to Latest First Harvest Date")
+  labs(y = "Variety", x = "Weight", title = "Total Tomato Harvests", subtitle = "From Earliest to Latest First Harvest Date")
 
 ggplotly(tomato_harvest,
          tooltip = c("text", "x"))
@@ -140,36 +141,23 @@ ggplotly(delays)
 garden_harvest %>% 
   filter(vegetable == "tomatoes") %>% 
   group_by(date, variety) %>% 
-  summarise(daily_weight = sum(weight) * 0.00220462) %>% 
+  summarize(daily_harvest_lb = sum(weight)*0.00220462) %>% 
   ungroup() %>% 
-  complete(date = seq.Date(min(date), max(date), by = "day")) %>% 
-  fill(variety, .direction = "down") %>% 
-  mutate(daily_weight = replace_na(daily_weight, 0)) %>% 
+  complete(variety, date, fill = list(daily_harvest_lb = 0)) %>% 
+  mutate(daily_harvest_lb = replace_na(daily_harvest_lb, 0)) %>% 
   group_by(variety) %>% 
-  mutate(cum_weight = cumsum(daily_weight)) %>% 
+  mutate(cum_weight = cumsum(daily_harvest_lb)) %>% 
   ggplot(aes(x = date, 
              y = cum_weight, 
-             fill = variety)) + 
-  geom_area(ggplot(aes(x = date, 
-             y = cum_harvest, 
-             fill = variety)) + 
-  geom_area(position = position_stack()))
-  
-```
-  
-  
-```{r}
-garden_harvest %>% 
-  filter(vegetable == "tomatoes") %>% 
-  mutate(daily_harvest_lbs = sum(weight) * 0.00220462) %>% 
-  group_by(variety) %>% 
-  mutate(cum_harvest = cumsum(daily_harvest_lbs)) %>% 
-  ggplot(aes(x = date, 
-             y = cum_harvest, 
-             fill = variety)) + 
+             fill = fct_reorder(variety, cum_weight, max, .desc = TRUE))) + 
   geom_area(position = position_stack()) + 
+  labs(x = "", y = "", 
+       title = "Cumulative Tomato Harvest (in Pounds)", 
+       subtitle = "Date: {frame_along}", 
+       fill = "Variety") +
   transition_reveal(date)
 ```
+ 
   
 ```{r, eval=FALSE, echo=FALSE}
 anim_save("tomatoharvest.gif")
@@ -226,12 +214,6 @@ knitr::include_graphics("bikeroute.gif")
   
   5. In this exercise, you get to meet my sister, Heather! She is a proud Mac grad, currently works as a Data Scientist at 3M where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files (HINT: `bind_rows()`, 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
-```{r}
-triathlon <- bind_rows(panama_swim, panama_bike, panama_run)
-triathlon %>% 
-  mutate(speed = )
-```
-  
   
 ```{r}
 triathlon <- bind_rows(panama_swim, panama_bike, panama_run)
@@ -263,7 +245,7 @@ knitr::include_graphics("triathlon.gif")
   
 ## COVID-19 data
 
-  6. In this exercise, you are going to replicate many of the features in [this](https://aatishb.com/covidtrends/?region=US) visualization by Aitish Bhatia but include all US states. Requirements:
+6. In this exercise, you are going to replicate many of the features in [this](https://aatishb.com/covidtrends/?region=US) visualization by Aitish Bhatia but include all US states. Requirements:
  * Create a new variable that computes the number of new cases in the past week (HINT: use the `lag()` function you've used in a previous set of exercises). Replace missing values with 0's using `replace_na()`.  
   * Filter the data to omit rows where the cumulative case counts are less than 20.  
   * Create a static plot with cumulative cases on the x-axis and new cases in the past 7 days on the x-axis. Connect the points for each state over time. HINTS: use `geom_path()` and add a `group` aesthetic.  Put the x and y axis on the log scale and make the tick labels look nice - `scales::comma` is one option. This plot will look pretty ugly as is.
@@ -272,23 +254,83 @@ knitr::include_graphics("triathlon.gif")
   * Comment on what you observe.
   
 ```{r}
-covid19 %>% 
-  filter(date <= Sys.Date() & date >= Sys.Date() - 7) %>% 
+covidplot <- 
+  covid19 %>% 
+  group_by(state) %>% 
   mutate(seven_day_lag = lag(cases, n = 7L), 
-         seven_day_lag = replace_na(seven_day_lag, 0)) %>% 
-  group_by(date) %>% 
-  mutate(seven_day_avg = (cases - seven_day_lag) / 7) %>% 
-  filter(seven_day_avg > 20) 
+         seven_day_lag = replace_na(seven_day_lag, 0), 
+         new_cases = cases - seven_day_lag) %>% 
+  filter(cases > 20) %>% 
+  ggplot() + 
+  geom_path(aes(x = cases, y = new_cases, group = state), color = "grey") +
+  geom_point(aes(x = cases, y = new_cases, group = state), color = "black") + 
+  geom_text(aes(x = cases, y = new_cases, group = state, label = state),
+            check_overlap = TRUE) +
+  labs(x = "Cumulative Cases", 
+     y = "New Cases in the Past Week", 
+     title = "COVID-19 Cases (on the logarithmic scale)", 
+     subtitle = "Date: {frame_along}") +
+  scale_x_log10(label = scales::label_comma()) + 
+  scale_y_log10(label = scales::label_comma()) +
+  transition_reveal(date) + 
+  theme_minimal()
+
+animate(plot = covidplot, nframes = 200, duration = 30)
 ```
-  
-  7. In this exercise you will animate a map of the US, showing how cumulative COVID-19 cases per 10,000 residents has changed over time. This is similar to exercises 11 & 12 from the previous exercises, with the added animation! So, in the end, you should have something like the static map you made there, but animated over all the days. Put date in the subtitle. Comment on what you see.
+
+```{r, eval=FALSE, echo=FALSE}
+anim_save("covid.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("covid.gif")
+```  
+
+**Observations:** It's interesting to watch New York's COVID numbers skyrocket at the beginning but then fall as their new case count drops. It's kind of fun to watch the states sort of battle each other for last place. 
+
+  7. In this exercise you will animate a map of the US, showing how cumulative COVID-19 cases per 10,000 residents has changed over time. This is similar to exercises 11 & 12 from the previous exercises, with the added animation! So, in the end, you should have something like the static map you made there, but animated over all the days. Put date in the subtitle. Comment on what you see. The code below gives the population estimates for each state. Because there are so many dates, you are going to only do the animation for all Fridays. So, use `wday()` to create a day of week variable and filter to all the Fridays. HINT: use `group = date` in `aes()`.
+
+```{r}
+census_pop_est_2018 <- read_csv("https://www.dropbox.com/s/6txwv3b4ng7pepe/us_census_2018_state_pop_est.csv?dl=1") %>% 
+  separate(state, into = c("dot","state"), extra = "merge") %>% 
+  select(-dot) %>% 
+  mutate(state = str_to_lower(state))
+
+states_map <- map_data("state")
+```
 
 
+```{r}
+covidplot1 <- covid19 %>%
+  filter(wday(date, label = TRUE) == "Fri") %>% 
+  mutate(state = str_to_lower(state)) %>% 
+  left_join(census_pop_est_2018, by = "state") %>% 
+  mutate(cases_per_10000 = (cases / est_pop_2018) * 10000) %>% 
+  ggplot(aes(fill = cases_per_10000)) + 
+  geom_map(aes(map_id = state, group = date),
+           map = states_map) + 
+  expand_limits(x = states_map$long, y = states_map$lat) + 
+  theme_map() + 
+  labs(title = "COVID-19 Cases per 10000 People", 
+       fill = "Cases", 
+       subtitle = "Date: {closest_state}") + 
+  transition_states(date)
+```
+
+```{r, eval=FALSE, echo=FALSE}
+anim_save("covid1.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("covid1.gif")
+```  
 
 
 ## Your first `shiny` app
 
   8. This app will also use the COVID data. Make sure you load that data and all the libraries you need in the `app.R` file you create. Below, you will post a link to the app that you publish on shinyapps.io. You will create an app to compare states' cumulative number of COVID cases over time. The x-axis will be number of days since 20+ cases and the y-axis will be cumulative cases on the log scale (`scale_y_log10()`). We use number of days since 20+ cases on the x-axis so we can make better comparisons of the curve trajectories. You will have an input box where the user can choose which states to compare (`selectInput()`) and have a submit button to click once the user has chosen all states they're interested in comparing. The graph should display a different line for each state, with labels either on the graph or in a legend. Color can be used if needed. 
+  
+
   
 ## GitHub link
 
