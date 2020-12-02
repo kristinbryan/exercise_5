@@ -1,0 +1,12 @@
+name: covid_app
+title: covid_app
+username:
+account: kristinbryan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3335116
+bundleId: 3930459
+url: https://kristinbryan.shinyapps.io/covid_app/
+when: 1606871761.96793
+asMultiple: FALSE
+asStatic: FALSE
