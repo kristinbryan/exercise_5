@@ -12,7 +12,7 @@ output:
 
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries}
@@ -181,7 +181,6 @@ knitr::include_graphics("tomatoharvest.gif")
   
 ```{r}
 bike_link <- "https://raw.githubusercontent.com/llendway/animation_and_interactivity/master/bike.png"
-
 mallorca_map <- get_stamenmap(
   bbox = c(left = 2.2514, bottom = 39.4314, right = 2.9010, top = 39.7673), 
   maptype = "toner-lite", 
@@ -216,7 +215,13 @@ knitr::include_graphics("bikeroute.gif")
   
   
 ```{r}
-triathlon <- bind_rows(panama_swim, panama_bike, panama_run)
+triathlon <- bind_rows(panama_swim, panama_bike, panama_run) %>% 
+  mutate(previous_time = lag(time, 1L), 
+         previous_lon = lag(lon, 1L), 
+         previous_lat = lag(lat, 1L), 
+         change_time = as.double(time - previous_time), 
+         distance = ((lon - previous_lon)^2 + (lat - previous_lat)^2)^(1/2), 
+         speed = distance / change_time)
 
 panama_map <- get_stamenmap(
   bbox = c(left = -79.6028, bottom = 8.9035, right = -79.4404, top = 9.0112),
@@ -226,11 +231,12 @@ panama_map <- get_stamenmap(
 
 ggmap(panama_map) +
   geom_path(data = triathlon,
-             aes(x = lon, y = lat, color = event),
+             aes(x = lon, y = lat, color = speed),
              size = .5) +
   geom_point(data = triathlon,
-             aes(x = lon, y = lat, color = event),
-             size = 1) +
+             aes(x = lon, y = lat, shape = event),
+             size = 2) +
+  scale_color_viridis_c() + 
   theme_map() + 
   transition_reveal(time)
 ```
@@ -315,6 +321,8 @@ covidplot1 <- covid19 %>%
        fill = "Cases", 
        subtitle = "Date: {closest_state}") + 
   transition_states(date)
+
+animate(covidplot1)
 ```
 
 ```{r, eval=FALSE, echo=FALSE}
@@ -337,6 +345,13 @@ knitr::include_graphics("covid1.gif")
 ## GitHub link
 
   9. Below, provide a link to your GitHub page with this set of Weekly Exercises. Specifically, if the name of the file is 05_exercises.Rmd, provide a link to the 05_exercises.md file, which is the one that will be most readable on GitHub. If that file isn't very readable, then provide a link to your main GitHub page.
+  
+  
+**Rmd Link:** https://github.com/kristinbryan/exercise_5/blob/master/05_exercises.Rmd
 
 
-**DID YOU REMEMBER TO UNCOMMENT THE OPTIONS AT THE TOP?**
+**md Link:** https://github.com/kristinbryan/exercise_5/blob/master/05_exercises.md
+
+
+**HTML Link:** https://github.com/kristinbryan/exercise_5/blob/master/05_exercises.html
+
